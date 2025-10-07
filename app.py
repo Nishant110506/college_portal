@@ -13,8 +13,8 @@ UPLOAD_FOLDER = "uploads"
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-ADMIN_USERNAME = "nish"
-ADMIN_PASSWORD = "nish123"
+ADMIN_USERNAME = "nish20"
+ADMIN_PASSWORD = "45009"
 
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
