@@ -142,7 +142,7 @@ elif choice == "Admin Login":
         if user == ADMIN_USERNAME and pwd == ADMIN_PASSWORD:
             st.session_state.admin_logged_in = True
             st.success("Login successful!")
-            st.experimental_rerun()
+            st.rerun
         else:
             st.error("Invalid credentials")
 
@@ -192,7 +192,7 @@ elif choice == "Admin Dashboard":
                     if st.button(f"Delete {fname}", key=f"del_{fpath}"):
                         if delete_file(fpath):
                             st.success(f"Deleted {fname}")
-                            st.experimental_rerun()
+                            st.rerun
                         else:
                             st.error(f"Failed to delete {fname}")
                 with col2:
