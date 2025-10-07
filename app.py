@@ -182,12 +182,46 @@ elif choice == "Admin Dashboard":
 
         import pandas as pd
 
+import pandas as pd
+
 st.markdown("---")
 st.markdown("### 📂 Uploaded Materials")
 
 files = list_files()
 if files:
-    df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Filename', 'Path'])
-    st.dataframe(df[['Course', 'Semester', 'Year', 'Filename']])
+    # Include Subject and Type columns by extending the tuple returned by list_files()
+    # You need to update list_files() to include subject and type if not done yet.
+
+    # For now assuming list_files returns (course, semester, year, filename, filepath),
+    # you need to modify list_files to fetch subject and type and return them also.
+
+    # Assuming now list_files returns (course, semester, year, subject, type, filename, filepath)
+    # Modify above accordingly.
+
+    # Sample adjusted DataFrame construction (adapting according to your schema)
+    df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
+
+    st.dataframe(df[['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename']])
+
+    selected_row = st.selectbox(
+        "Select a file to manage",
+        df.index,
+        format_func=lambda idx: f"{df.at[idx, 'Filename']} — {df.at[idx, 'Course']} Sem {df.at[idx, 'Semester']} Year {df.at[idx, 'Year']}"
+    )
+    selected_file = df.loc[selected_row]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Delete Selected File"):
+            if delete_file(selected_file['Path']):
+                st.success(f"Deleted {selected_file['Filename']}")
+                st.rerun()
+            else:
+                st.error("Delete failed.")
+    with col2:
+        with open(selected_file['Path'], "rb") as f:
+            st.download_button("⬇️ Download", data=f, file_name=selected_file['Filename'])
+
 else:
     st.info("No files uploaded yet.")
+
