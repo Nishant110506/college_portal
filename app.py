@@ -159,7 +159,7 @@ elif choice == "Admin Dashboard":
         if st.button("🚪 Logout"):
             st.session_state.admin_logged_in = False
             st.success("You have been logged out.")
-            st.experimental_rerun()
+            st.rerun()
 
         st.markdown("### ⬆️ Upload New Material")
 
