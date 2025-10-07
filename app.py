@@ -4,6 +4,7 @@ import shutil
 import datetime
 import uuid
 
+
 # ----------------------------
 # BASIC SETUP
 # ----------------------------
@@ -19,12 +20,12 @@ ADMIN_PASSWORD = "45009Ni"
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
 
+
 # ----------------------------
 # FUNCTIONS
 # ----------------------------
 def save_file(uploaded_file, course, semester, year, subject, file_type):
-    """Save uploaded file with structured naming (safe for Windows paths)."""
-    # Replace spaces and slashes with underscores
+    """Save uploaded file with structured naming."""
     safe_course = course.replace(" ", "_").replace("\\", "_").replace("/", "_")
     safe_semester = semester.replace(" ", "_")
     safe_year = year.replace(" ", "_")
@@ -57,6 +58,19 @@ def list_files(course=None, semester=None, year=None):
                     all_files.append((c, s, y, fname, file_path))
     return all_files
 
+
+def delete_file(file_path):
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        # Remove empty folders up to UPLOAD_FOLDER
+        dir_path = os.path.dirname(file_path)
+        while dir_path != UPLOAD_FOLDER and not os.listdir(dir_path):
+            os.rmdir(dir_path)
+            dir_path = os.path.dirname(dir_path)
+        return True
+    return False
+
+
 # ----------------------------
 # HEADER
 # ----------------------------
@@ -69,6 +83,7 @@ st.markdown("---")
 menu = ["Home", "Search Materials", "Admin Login", "Admin Dashboard"]
 choice = st.sidebar.radio("Navigation", menu)
 
+
 # ----------------------------
 # HOME
 # ----------------------------
@@ -78,26 +93,24 @@ if choice == "Home":
     st.write("Upload, view, and search for PYQs and notes easily!")
     st.info("Use the sidebar to navigate between student and admin sections.")
 
+
 # ----------------------------
 # SEARCH MATERIALS
 # ----------------------------
 elif choice == "Search Materials":
     st.subheader("🎓 Search or Browse Materials")
 
-    # Dropdown filters
     course_options = sorted([d for d in os.listdir(UPLOAD_FOLDER) if os.path.isdir(os.path.join(UPLOAD_FOLDER, d))])
     course = st.selectbox("Select Course (optional)", ["All"] + course_options)
     semester = st.selectbox("Select Semester (optional)", ["All", "1st", "2nd", "3rd", "4th", "5th", "6th"])
     year = st.selectbox("Select Year (optional)", ["All", "2023", "2024", "2025"])
 
-    # Buttons
     col1, col2 = st.columns(2)
     with col1:
         search_btn = st.button("🔍 Search")
     with col2:
         show_all = st.button("📂 Show All Files")
 
-    # Logic
     if search_btn or show_all:
         if show_all:
             files = list_files()
@@ -117,6 +130,7 @@ elif choice == "Search Materials":
         else:
             st.warning("No files found.")
 
+
 # ----------------------------
 # ADMIN LOGIN
 # ----------------------------
@@ -128,9 +142,10 @@ elif choice == "Admin Login":
         if user == ADMIN_USERNAME and pwd == ADMIN_PASSWORD:
             st.session_state.admin_logged_in = True
             st.success("Login successful!")
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
+
 
 # ----------------------------
 # ADMIN DASHBOARD
@@ -139,13 +154,49 @@ elif choice == "Admin Dashboard":
     if not st.session_state.admin_logged_in:
         st.error("Please login as admin to access this section.")
     else:
-        # Header
         st.success(f"Welcome Admin 👋 ({ADMIN_USERNAME})")
 
-        # Add Logout button
         if st.button("🚪 Logout"):
             st.session_state.admin_logged_in = False
             st.success("You have been logged out.")
-            st.rerun()
+            st.experimental_rerun()
 
         st.markdown("### ⬆️ Upload New Material")
+
+        uploaded_file = st.file_uploader("Choose a file")
+        course = st.selectbox("Course", sorted([d for d in os.listdir(UPLOAD_FOLDER) if os.path.isdir(os.path.join(UPLOAD_FOLDER, d))] + ["BSc", "BCA", "BCom", "BA"]))
+        semester = st.selectbox("Semester", ["1st", "2nd", "3rd", "4th", "5th", "6th"])
+        year = st.selectbox("Year", ["2023", "2024", "2025"])
+        subject = st.text_input("Subject")
+        file_type = st.selectbox("Type", ["Notes", "PYQ", "Other"])
+
+        if st.button("Upload"):
+            if uploaded_file and course and semester and year and subject and file_type:
+                try:
+                    saved_path = save_file(uploaded_file, course, semester, year, subject, file_type)
+                    st.success(f"File uploaded successfully: {saved_path}")
+                except Exception as e:
+                    st.error(f"Error saving file: {e}")
+            else:
+                st.error("Please fill all fields and select a file.")
+
+        st.markdown("---")
+        st.markdown("### 📂 Uploaded Materials")
+
+        files = list_files()
+        if files:
+            for c, s, y, fname, fpath in files:
+                st.write(f"**{fname}** — {c}, Sem {s}, Year {y}")
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button(f"Delete {fname}", key=f"del_{fpath}"):
+                        if delete_file(fpath):
+                            st.success(f"Deleted {fname}")
+                            st.experimental_rerun()
+                        else:
+                            st.error(f"Failed to delete {fname}")
+                with col2:
+                    with open(fpath, "rb") as f:
+                        st.download_button(label="⬇️ Download", data=f, file_name=fname, key=f"dl_{fpath}")
+        else:
+            st.info("No files uploaded yet.")
