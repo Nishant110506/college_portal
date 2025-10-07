@@ -180,23 +180,14 @@ elif choice == "Admin Dashboard":
             else:
                 st.error("Please fill all fields and select a file.")
 
-        st.markdown("---")
-        st.markdown("### 📂 Uploaded Materials")
+        import pandas as pd
 
-        files = list_files()
-        if files:
-            for c, s, y, fname, fpath in files:
-                st.write(f"**{fname}** — {c}, Sem {s}, Year {y}")
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    if st.button(f"Delete {fname}", key=f"del_{fpath}"):
-                        if delete_file(fpath):
-                            st.success(f"Deleted {fname}")
-                            st.rerun
-                        else:
-                            st.error(f"Failed to delete {fname}")
-                with col2:
-                    with open(fpath, "rb") as f:
-                        st.download_button(label="⬇️ Download", data=f, file_name=fname, key=f"dl_{fpath}")
-        else:
-            st.info("No files uploaded yet.")
+st.markdown("---")
+st.markdown("### 📂 Uploaded Materials")
+
+files = list_files()
+if files:
+    df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Filename', 'Path'])
+    st.dataframe(df[['Course', 'Semester', 'Year', 'Filename']])
+else:
+    st.info("No files uploaded yet.")
