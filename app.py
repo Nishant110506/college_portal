@@ -139,32 +139,13 @@ elif choice == "Admin Dashboard":
     if not st.session_state.admin_logged_in:
         st.error("Please login as admin to access this section.")
     else:
-        st.success("Welcome Admin!")
+        # Header
+        st.success(f"Welcome Admin 👋 ({ADMIN_USERNAME})")
+
+        # Add Logout button
+        if st.button("🚪 Logout"):
+            st.session_state.admin_logged_in = False
+            st.success("You have been logged out.")
+            st.rerun()
+
         st.markdown("### ⬆️ Upload New Material")
-
-        with st.form("upload_form"):
-            course = st.text_input("Course Name")
-            semester = st.selectbox("Semester", ["1st", "2nd", "3rd", "4th", "5th", "6th"])
-            year = st.selectbox("Year", ["2023", "2024", "2025"])
-            subject = st.text_input("Subject")
-            file_type = st.selectbox("Type", ["Notes", "PYQ", "Other"])
-            uploaded_file = st.file_uploader("Choose a file", type=["pdf", "docx", "pptx", "txt", "jpg", "png"])
-            submit = st.form_submit_button("Upload")
-
-            if submit and uploaded_file:
-                path = save_file(uploaded_file, course, semester, year, subject, file_type)
-                st.success(f"✅ File uploaded successfully: {os.path.basename(path)}")
-
-        st.markdown("---")
-        st.markdown("### 🗂️ Uploaded Files")
-
-        all_files = list_files()
-        for c, s, y, fname, fpath in all_files:
-            st.write(f"📘 **{fname}** — {c}, Sem {s}, Year {y}")
-            cols = st.columns([1, 1])
-            with open(fpath, "rb") as f:
-                cols[0].download_button("⬇️ Download", f, file_name=fname)
-            if cols[1].button("🗑️ Delete", key=fpath):
-                os.remove(fpath)
-                st.warning(f"Deleted {fname}")
-                st.rerun()
