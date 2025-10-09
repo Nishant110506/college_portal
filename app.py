@@ -178,11 +178,11 @@ elif choice == "Admin Dashboard":
         st.markdown("### ⬆️ Upload New Material")
 
         uploaded_file = st.file_uploader("Choose a file")
-        course = st.selectbox("Course", sorted(["BSc", "BCA", "BCom", "BA"]))
+        course = st.selectbox("Course", sorted(["BSc Physical Science ", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"]))
         semester = st.selectbox("Semester", ["1st", "2nd", "3rd", "4th", "5th", "6th"])
         year = st.selectbox("Year", ["2023", "2024", "2025"])
-        subject = st.text_input("Subject")
-        file_type = st.selectbox("Type", ["Notes", "PYQ", "Other"])
+        subject = st.text_input("Subject",["Hindi", "English", "Maths", "Physics", "Computer Science", "Political Science", "History", "Geography", "AEC", "DSE", "SEC", "VAC", "GE"])
+        file_type = st.selectbox("Type", ["Notes", "PYQ", "Books"])
 
         if st.button("Upload"):
             if uploaded_file and course and semester and year and subject and file_type:
