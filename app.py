@@ -3,44 +3,32 @@ import os
 import datetime
 import uuid
 import pandas as pd
+from pathlib import Path
 
 # ----------------------------
 # BASIC SETUP
 # ----------------------------
 st.set_page_config(page_title="College PYQ & Notes Portal", page_icon="📚", layout="wide")
 
-# Disable typing in selectboxes (students can only click)
+# Disable typing in selectboxes
 st.markdown("""
     <style>
     div[data-baseweb="select"] input {
-        pointer-events: none !important;
+        pointer-events: none;
     }
     div[data-baseweb="select"] input:focus {
-        outline: none !important;
+        outline: none;
     }
     </style>
 """, unsafe_allow_html=True)
 
-import os
-from pathlib import Path
-
-# Create a permanent folder inside user's home directory
+# Permanent data folder
 BASE_DIR = Path.home() / "college_portal_data"
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 SUGGESTIONS_FILE = BASE_DIR / "suggestions.csv"
 
-# Ensure directories exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not SUGGESTIONS_FILE.exists():
-    import pandas as pd
-    pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Suggestion", "Completed"]).to_csv(SUGGESTIONS_FILE, index=False)
-
-SUGGESTIONS_FILE = "suggestions.csv"
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-if not os.path.exists(SUGGESTIONS_FILE):
     pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Suggestion", "Completed"]).to_csv(SUGGESTIONS_FILE, index=False)
 
 ADMIN_USERNAME = "nish20"
@@ -54,6 +42,7 @@ if "admin_logged_in" not in st.session_state:
 # FUNCTIONS
 # ----------------------------
 def save_file(uploaded_file, course, semester, year, subject, file_type):
+    """Save uploaded file with structured folder hierarchy"""
     safe_course = course.replace(" ", "_")
     safe_semester = semester.replace(" ", "_")
     safe_year = year.replace(" ", "_")
@@ -73,6 +62,7 @@ def save_file(uploaded_file, course, semester, year, subject, file_type):
 
 
 def list_files(course=None, semester=None, year=None, subject=None):
+    """List all uploaded materials"""
     all_files = []
     for root, _, files in os.walk(UPLOAD_FOLDER):
         for file in files:
@@ -83,7 +73,6 @@ def list_files(course=None, semester=None, year=None, subject=None):
             if len(parts) >= 4:
                 c, s, y = parts[0], parts[1], parts[2]
                 fname = parts[3]
-
                 subject_name = "Unknown"
                 ftype = "Unknown"
                 if "_" in fname:
@@ -103,10 +92,11 @@ def list_files(course=None, semester=None, year=None, subject=None):
 
 
 def delete_file(file_path):
+    """Delete a file and clean up empty folders"""
     if os.path.exists(file_path):
         os.remove(file_path)
         dir_path = os.path.dirname(file_path)
-        while dir_path != UPLOAD_FOLDER and not os.listdir(dir_path):
+        while dir_path != str(UPLOAD_FOLDER) and not os.listdir(dir_path):
             os.rmdir(dir_path)
             dir_path = os.path.dirname(dir_path)
         return True
@@ -140,7 +130,6 @@ st.markdown("---")
 menu = ["Home", "Search Materials", "Admin Login", "Admin Dashboard"]
 choice = st.sidebar.radio("Navigation", menu)
 
-
 # ----------------------------
 # HOME
 # ----------------------------
@@ -150,9 +139,8 @@ if choice == "Home":
     st.write("Upload, view, and search for PYQs and notes easily!")
     st.info("Use the sidebar to navigate between student and admin sections.")
 
-
 # ----------------------------
-# STUDENT DASHBOARD
+# SEARCH MATERIALS (STUDENT)
 # ----------------------------
 elif choice == "Search Materials":
     st.subheader("🎓 Search or Browse Materials")
@@ -166,44 +154,32 @@ elif choice == "Search Materials":
     year = st.selectbox("Select Year", ["All", "2023", "2024", "2025"])
     subject = st.selectbox("Select Subject", subject_options)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        search_btn = st.button("🔍 Search")
-    with col2:
-        show_all = st.button("📂 Show All Files")
-
-    if search_btn or show_all:
-        if show_all:
-            files = list_files()
-        else:
-            files = list_files(
-                None if course == "All" else course,
-                None if semester == "All" else semester,
-                None if year == "All" else year,
-                None if subject == "All" else subject,
-            )
+    if st.button("🔍 Search"):
+        files = list_files(
+            None if course == "All" else course,
+            None if semester == "All" else semester,
+            None if year == "All" else year,
+            None if subject == "All" else subject,
+        )
 
         if files:
-            st.markdown("### 📚 Available Materials:")
+            st.markdown("### 📂 Available Materials:")
             for c, s, y, sub, typ, fname, fpath in files:
-                st.write(f"**📄 {fname}** — {c}, Sem {s}, Year {y}, Subject: {sub}, Type: {typ}")
+                st.write(f"**📘 {fname}** — {c}, Sem {s}, Year {y}, Subject: {sub}, Type: {typ}")
                 with open(fpath, "rb") as f:
-                    st.download_button(label="⬇️ Download", data=f, file_name=fname, key=fpath)
+                    st.download_button("⬇️ Download", f, file_name=fname, key=fpath)
         else:
             st.warning("No files found.")
 
     st.markdown("---")
-    st.markdown("### 💬 Suggestion Box")
-    st.info("Submit your feedback, queries, or material requests to the admin.")
-
-    suggestion_text = st.text_area("Enter your suggestion here:")
+    st.markdown("### 💬 Suggestion Box (For Students)")
+    suggestion_text = st.text_area("Enter your suggestion or query here:")
     if st.button("📨 Submit Suggestion"):
         if suggestion_text.strip():
             save_suggestion(course, semester, year, subject, suggestion_text.strip())
-            st.success("✅ Suggestion sent successfully!")
+            st.success("✅ Your suggestion has been sent to the admin!")
         else:
-            st.warning("Please enter a valid suggestion before submitting.")
-
+            st.warning("Please write something before submitting.")
 
 # ----------------------------
 # ADMIN LOGIN
@@ -220,7 +196,6 @@ elif choice == "Admin Login":
         else:
             st.error("Invalid credentials")
 
-
 # ----------------------------
 # ADMIN DASHBOARD
 # ----------------------------
@@ -232,7 +207,7 @@ elif choice == "Admin Dashboard":
 
         if st.button("🚪 Logout"):
             st.session_state.admin_logged_in = False
-            st.success("You have been logged out.")
+            st.success("Logged out.")
             st.rerun()
 
         st.markdown("### ⬆️ Upload New Material")
@@ -246,44 +221,44 @@ elif choice == "Admin Dashboard":
         file_type = st.selectbox("Type", ["Notes", "PYQ", "Books"])
 
         if st.button("Upload"):
-            if uploaded_file and course and semester and year and subject and file_type:
+            if uploaded_file:
                 try:
                     saved_path = save_file(uploaded_file, course, semester, year, subject, file_type)
-                    st.success(f"✅ File uploaded successfully: {saved_path}")
+                    st.success(f"✅ File uploaded successfully: {os.path.basename(saved_path)}")
                 except Exception as e:
                     st.error(f"Error saving file: {e}")
             else:
-                st.error("Please fill all fields and select a file.")
+                st.warning("Please choose a file first.")
 
         st.markdown("---")
-        st.markdown("### 📂 Uploaded Materials")
+        st.markdown("### 📘 Uploaded Materials")
 
         files = list_files()
         if files:
             df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
-            for i, row in df.iterrows():
-                st.write(f"**📄 {row['Filename']}** — {row['Course']}, Sem {row['Semester']}, Year {row['Year']}, {row['Subject']} ({row['Type']})")
-                delete_btn = st.button(f"🗑️ Delete File {i}", key=f"del_file_{i}")
-                if delete_btn:
-                    if delete_file(row["Path"]):
-                        st.success("File deleted successfully!")
-                        st.rerun()
+            st.dataframe(df[['Filename', 'Course', 'Semester', 'Year', 'Subject', 'Type']])
+
+            # Delete section
+            st.markdown("### 🗑️ Delete Uploaded Material")
+            filename_to_delete = st.selectbox("Select file to delete", df['Filename'].tolist())
+            if st.button("Confirm Delete"):
+                file_path = df.loc[df['Filename'] == filename_to_delete, 'Path'].values[0]
+                if delete_file(file_path):
+                    st.success(f"✅ Deleted {filename_to_delete}")
+                    st.rerun()
+                else:
+                    st.error("Could not delete file.")
         else:
-            st.info("No files uploaded yet.")
+            st.info("No uploaded materials found.")
 
         st.markdown("---")
         st.markdown("### 📨 Student Suggestions / Queries")
 
         suggestions_df = pd.read_csv(SUGGESTIONS_FILE)
-
         if suggestions_df.empty:
             st.info("No suggestions submitted yet.")
         else:
-            filter_choice = st.radio(
-                "👁️ Show Suggestions:",
-                ["All", "Pending Only", "Completed Only"],
-                horizontal=True
-            )
+            filter_choice = st.radio("👁️ Show Suggestions:", ["All", "Pending Only", "Completed Only"], horizontal=True)
 
             if filter_choice == "Pending Only":
                 filtered_df = suggestions_df[suggestions_df["Completed"] == False].copy()
@@ -292,10 +267,9 @@ elif choice == "Admin Dashboard":
             else:
                 filtered_df = suggestions_df.copy()
 
-            filtered_df = filtered_df.reset_index()  # retain original index
-
+            filtered_df = filtered_df.reset_index()
             for _, row in filtered_df.iterrows():
-                idx = row["index"]  # true index in CSV
+                idx = row["index"]
                 with st.expander(f"🕒 {row['Timestamp']} — {row['Course']} | {row['Semester']} | {row['Year']} | {row['Subject']}"):
                     st.write(f"**Suggestion:** {row['Suggestion']}")
                     completed = st.checkbox("✅ Mark as Completed", value=row["Completed"], key=f"comp_{idx}")
