@@ -13,10 +13,10 @@ st.set_page_config(page_title="College PYQ & Notes Portal", page_icon="📚", la
 st.markdown("""
     <style>
     div[data-baseweb="select"] input {
-        pointer-events: none;
+        pointer-events: none !important;
     }
     div[data-baseweb="select"] input:focus {
-        outline: none;
+        outline: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -127,6 +127,7 @@ st.markdown("---")
 menu = ["Home", "Search Materials", "Admin Login", "Admin Dashboard"]
 choice = st.sidebar.radio("Navigation", menu)
 
+
 # ----------------------------
 # HOME
 # ----------------------------
@@ -136,8 +137,9 @@ if choice == "Home":
     st.write("Upload, view, and search for PYQs and notes easily!")
     st.info("Use the sidebar to navigate between student and admin sections.")
 
+
 # ----------------------------
-# SEARCH MATERIALS (STUDENT)
+# STUDENT DASHBOARD
 # ----------------------------
 elif choice == "Search Materials":
     st.subheader("🎓 Search or Browse Materials")
@@ -178,16 +180,17 @@ elif choice == "Search Materials":
             st.warning("No files found.")
 
     st.markdown("---")
-    st.markdown("### 💬 Suggestion Box (For Students)")
-    st.info("Submit your queries, issues, or suggestions to the admin here.")
+    st.markdown("### 💬 Suggestion Box")
+    st.info("Submit your feedback, queries, or material requests to the admin.")
 
-    suggestion_text = st.text_area("Enter your suggestion or query here:")
+    suggestion_text = st.text_area("Enter your suggestion here:")
     if st.button("📨 Submit Suggestion"):
         if suggestion_text.strip():
             save_suggestion(course, semester, year, subject, suggestion_text.strip())
-            st.success("✅ Your suggestion has been sent to the admin!")
+            st.success("✅ Suggestion sent successfully!")
         else:
-            st.warning("Please write something before submitting.")
+            st.warning("Please enter a valid suggestion before submitting.")
+
 
 # ----------------------------
 # ADMIN LOGIN
@@ -203,6 +206,7 @@ elif choice == "Admin Login":
             st.rerun()
         else:
             st.error("Invalid credentials")
+
 
 # ----------------------------
 # ADMIN DASHBOARD
@@ -244,7 +248,13 @@ elif choice == "Admin Dashboard":
         files = list_files()
         if files:
             df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
-            st.dataframe(df[['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename']])
+            for i, row in df.iterrows():
+                st.write(f"**📄 {row['Filename']}** — {row['Course']}, Sem {row['Semester']}, Year {row['Year']}, {row['Subject']} ({row['Type']})")
+                delete_btn = st.button(f"🗑️ Delete File {i}", key=f"del_file_{i}")
+                if delete_btn:
+                    if delete_file(row["Path"]):
+                        st.success("File deleted successfully!")
+                        st.rerun()
         else:
             st.info("No files uploaded yet.")
 
