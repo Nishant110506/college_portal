@@ -3,7 +3,7 @@ import os
 import shutil
 import datetime
 import uuid
-
+import pandas as pd  # ✅ keep all imports together at top
 
 # ----------------------------
 # BASIC SETUP
@@ -52,10 +52,24 @@ def list_files(course=None, semester=None, year=None):
             file_path = os.path.join(root, file)
             rel_path = os.path.relpath(file_path, UPLOAD_FOLDER)
             parts = rel_path.split(os.sep)
+
+            # Extract info from folder structure and filename
             if len(parts) >= 4:
-                c, s, y, fname = parts[0], parts[1], parts[2], parts[3]
+                c, s, y = parts[0], parts[1], parts[2]
+                fname = parts[3]
+
+                # Extract subject & type from filename if possible
+                subject = "Unknown"
+                ftype = "Unknown"
+                if "_" in fname:
+                    split_name = fname.split("_")
+                    subject = split_name[0]
+                    if len(split_name) > 1:
+                        ftype = split_name[1]
+
                 if (not course or c == course) and (not semester or s == semester) and (not year or y == year):
-                    all_files.append((c, s, y, fname, file_path))
+                    all_files.append((c, s, y, subject, ftype, fname, file_path))
+
     return all_files
 
 
@@ -123,8 +137,8 @@ elif choice == "Search Materials":
 
         if files:
             st.markdown("### 📚 Available Materials:")
-            for c, s, y, fname, fpath in files:
-                st.write(f"**📄 {fname}** — {c}, Sem {s}, Year {y}")
+            for c, s, y, sub, typ, fname, fpath in files:
+                st.write(f"**📄 {fname}** — {c}, Sem {s}, Year {y}, Subject: {sub}, Type: {typ}")
                 with open(fpath, "rb") as f:
                     st.download_button(label="⬇️ Download", data=f, file_name=fname, key=fpath)
         else:
@@ -142,7 +156,7 @@ elif choice == "Admin Login":
         if user == ADMIN_USERNAME and pwd == ADMIN_PASSWORD:
             st.session_state.admin_logged_in = True
             st.success("Login successful!")
-            st.rerun
+            st.rerun()
         else:
             st.error("Invalid credentials")
 
@@ -164,7 +178,7 @@ elif choice == "Admin Dashboard":
         st.markdown("### ⬆️ Upload New Material")
 
         uploaded_file = st.file_uploader("Choose a file")
-        course = st.selectbox("Course", sorted([d for d in os.listdir(UPLOAD_FOLDER) if os.path.isdir(os.path.join(UPLOAD_FOLDER, d))] + ["BSc", "BCA", "BCom", "BA"]))
+        course = st.selectbox("Course", sorted(["BSc", "BCA", "BCom", "BA"]))
         semester = st.selectbox("Semester", ["1st", "2nd", "3rd", "4th", "5th", "6th"])
         year = st.selectbox("Year", ["2023", "2024", "2025"])
         subject = st.text_input("Subject")
@@ -180,48 +194,31 @@ elif choice == "Admin Dashboard":
             else:
                 st.error("Please fill all fields and select a file.")
 
-        import pandas as pd
+        st.markdown("---")
+        st.markdown("### 📂 Uploaded Materials")
 
-import pandas as pd
+        files = list_files()
+        if files:
+            df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
+            st.dataframe(df[['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename']])
 
-st.markdown("---")
-st.markdown("### 📂 Uploaded Materials")
+            selected_row = st.selectbox(
+                "Select a file to manage",
+                df.index,
+                format_func=lambda idx: f"{df.at[idx, 'Filename']} — {df.at[idx, 'Course']} Sem {df.at[idx, 'Semester']} Year {df.at[idx, 'Year']}"
+            )
+            selected_file = df.loc[selected_row]
 
-files = list_files()
-if files:
-    # Include Subject and Type columns by extending the tuple returned by list_files()
-    # You need to update list_files() to include subject and type if not done yet.
-
-    # For now assuming list_files returns (course, semester, year, filename, filepath),
-    # you need to modify list_files to fetch subject and type and return them also.
-
-    # Assuming now list_files returns (course, semester, year, subject, type, filename, filepath)
-    # Modify above accordingly.
-
-    # Sample adjusted DataFrame construction (adapting according to your schema)
-    df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
-
-    st.dataframe(df[['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename']])
-
-    selected_row = st.selectbox(
-        "Select a file to manage",
-        df.index,
-        format_func=lambda idx: f"{df.at[idx, 'Filename']} — {df.at[idx, 'Course']} Sem {df.at[idx, 'Semester']} Year {df.at[idx, 'Year']}"
-    )
-    selected_file = df.loc[selected_row]
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Delete Selected File"):
-            if delete_file(selected_file['Path']):
-                st.success(f"Deleted {selected_file['Filename']}")
-                st.rerun()
-            else:
-                st.error("Delete failed.")
-    with col2:
-        with open(selected_file['Path'], "rb") as f:
-            st.download_button("⬇️ Download", data=f, file_name=selected_file['Filename'])
-
-else:
-    st.info("No files uploaded yet.")
-
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Delete Selected File"):
+                    if delete_file(selected_file['Path']):
+                        st.success(f"Deleted {selected_file['Filename']}")
+                        st.rerun()
+                    else:
+                        st.error("Delete failed.")
+            with col2:
+                with open(selected_file['Path'], "rb") as f:
+                    st.download_button("⬇️ Download", data=f, file_name=selected_file['Filename'])
+        else:
+            st.info("No files uploaded yet.")
