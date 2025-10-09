@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 # ==================== CONFIG ==================== #
-st.set_page_config(page_title="Student Material Portal", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="College Materials Portal", page_icon="🎓", layout="wide")
 
 BASE_DIR = Path(__file__).parent
 UPLOAD_FOLDER = BASE_DIR / "uploads"
@@ -52,7 +52,7 @@ def save_suggestion(course, semester, year, subject, suggestion):
     df.to_csv(SUGGESTIONS_FILE, index=False)
 
 # ==================== SIDEBAR ==================== #
-st.sidebar.title("🎓 Navigation")
+st.sidebar.title("📚 Navigation")
 choice = st.sidebar.radio("Go to:", ["Student Dashboard", "Admin Dashboard"])
 st.sidebar.markdown("---")
 
@@ -113,10 +113,27 @@ if choice == "Student Dashboard":
 elif choice == "Admin Dashboard":
     st.title("🧑‍💻 Admin Dashboard")
 
-    admin_password = st.text_input("Enter admin password:", type="password")
-    if admin_password != "admin123":
-        st.warning("Enter the correct admin password to continue.")
+    # --- LOGIN MANAGEMENT --- #
+    if "admin_logged_in" not in st.session_state:
+        st.session_state.admin_logged_in = False
+
+    if not st.session_state.admin_logged_in:
+        admin_password = st.text_input("Enter admin password:", type="password")
+        if st.button("Login"):
+            if admin_password == "admin123":  # change password here
+                st.session_state.admin_logged_in = True
+                st.success("✅ Logged in successfully!")
+                st.rerun()
+            else:
+                st.error("❌ Incorrect password.")
         st.stop()
+
+    # --- LOGOUT BUTTON --- #
+    st.sidebar.success("✅ Logged in as Admin")
+    if st.sidebar.button("🚪 Logout"):
+        st.session_state.admin_logged_in = False
+        st.success("👋 Logged out successfully!")
+        st.rerun()
 
     st.success("Welcome, Admin! ✅")
     st.markdown("---")
