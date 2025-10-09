@@ -21,7 +21,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-UPLOAD_FOLDER = "uploads"
+import os
+from pathlib import Path
+
+# Create a permanent folder inside user's home directory
+BASE_DIR = Path.home() / "college_portal_data"
+UPLOAD_FOLDER = BASE_DIR / "uploads"
+SUGGESTIONS_FILE = BASE_DIR / "suggestions.csv"
+
+# Ensure directories exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+if not SUGGESTIONS_FILE.exists():
+    import pandas as pd
+    pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Suggestion", "Completed"]).to_csv(SUGGESTIONS_FILE, index=False)
+
 SUGGESTIONS_FILE = "suggestions.csv"
 
 if not os.path.exists(UPLOAD_FOLDER):
