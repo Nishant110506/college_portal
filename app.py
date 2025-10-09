@@ -25,11 +25,16 @@ BASE_DIR = Path(".")
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 SUGGESTIONS_FILE = BASE_DIR / "suggestions.csv"
 SUBJECTS_FILE = BASE_DIR / "subjects.csv"
+METADATA_FILE = BASE_DIR / "uploads_metadata.csv"
 
-# Ensure required directories and files exist
+# Ensure required directories/files exist
 UPLOAD_FOLDER.mkdir(exist_ok=True)
+
 if not SUGGESTIONS_FILE.exists():
     pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Suggestion", "Completed"]).to_csv(SUGGESTIONS_FILE, index=False)
+
+if not METADATA_FILE.exists():
+    pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Type", "Filename", "Path", "Uploader"]).to_csv(METADATA_FILE, index=False)
 
 default_subjects = [
     "Hindi", "English", "Maths", "Physics", "Computer Science",
@@ -48,7 +53,8 @@ if "admin_logged_in" not in st.session_state:
 # ----------------------------
 # HELPER FUNCTIONS
 # ----------------------------
-def save_file(uploaded_file, course, semester, year, subject, file_type):
+def save_file(uploaded_file, course, semester, year, subject, file_type, uploader):
+    """Save the uploaded file and record its metadata."""
     safe_course = course.replace(" ", "_")
     safe_semester = semester.replace(" ", "_")
     safe_year = year.replace(" ", "_")
@@ -64,42 +70,36 @@ def save_file(uploaded_file, course, semester, year, subject, file_type):
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
+    # Save metadata
+    meta_df = pd.read_csv(METADATA_FILE)
+    new_entry = {
+        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Course": course,
+        "Semester": semester,
+        "Year": year,
+        "Subject": subject,
+        "Type": file_type,
+        "Filename": unique_name,
+        "Path": str(file_path),
+        "Uploader": uploader.strip() or "Unknown"
+    }
+    meta_df = pd.concat([meta_df, pd.DataFrame([new_entry])], ignore_index=True)
+    meta_df.to_csv(METADATA_FILE, index=False)
+
     return file_path
 
 
-def list_files(course=None, semester=None, year=None, subject=None):
-    all_files = []
-    for root, _, files in os.walk(UPLOAD_FOLDER):
-        for file in files:
-            file_path = Path(root) / file
-            rel_path = file_path.relative_to(UPLOAD_FOLDER)
-            parts = rel_path.parts
-
-            if len(parts) >= 4:
-                c, s, y = parts[0], parts[1], parts[2]
-                fname = parts[3]
-                subject_name, ftype = "Unknown", "Unknown"
-
-                if "_" in fname:
-                    split_name = fname.split("_")
-                    subject_name = split_name[0]
-                    if len(split_name) > 1:
-                        ftype = split_name[1]
-
-                if (
-                    (not course or c == course)
-                    and (not semester or s == semester)
-                    and (not year or y == year)
-                    and (not subject or subject_name == subject)
-                ):
-                    all_files.append((c, s, y, subject_name, ftype, fname, str(file_path)))
-    return all_files
-
-
 def delete_file(file_path):
+    """Delete the file and remove its metadata entry."""
     file_path = Path(file_path)
     if file_path.exists():
         file_path.unlink()
+        # Remove metadata
+        meta_df = pd.read_csv(METADATA_FILE)
+        meta_df = meta_df[meta_df["Path"] != str(file_path)]
+        meta_df.to_csv(METADATA_FILE, index=False)
+
+        # Clean empty folders
         dir_path = file_path.parent
         while dir_path != UPLOAD_FOLDER and not any(dir_path.iterdir()):
             dir_path.rmdir()
@@ -159,7 +159,7 @@ if choice == "Home":
     st.info("Use the sidebar to navigate between student and admin sections.")
 
 # ----------------------------
-# SEARCH MATERIALS (STUDENT)
+# STUDENT SECTION
 # ----------------------------
 elif choice == "Search Materials":
     st.subheader("🎓 Search or Browse Materials")
@@ -179,24 +179,29 @@ elif choice == "Search Materials":
     with col2:
         show_all = st.button("📂 Show All Files")
 
+    meta_df = pd.read_csv(METADATA_FILE)
+
     if search_btn or show_all:
-        if show_all:
-            files = list_files()
-        else:
-            files = list_files(
-                None if course == "All" else course,
-                None if semester == "All" else semester,
-                None if year == "All" else year,
-                None if subject == "All" else subject,
-            )
+        df = meta_df.copy()
+        if not show_all:
+            if course != "All":
+                df = df[df["Course"] == course]
+            if semester != "All":
+                df = df[df["Semester"] == semester]
+            if year != "All":
+                df = df[df["Year"] == year]
+            if subject != "All":
+                df = df[df["Subject"] == subject]
 
-        if files:
+        if not df.empty:
             st.markdown("### 📘 Available Materials")
-            df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
-            st.dataframe(df[['Filename', 'Course', 'Semester', 'Year', 'Subject', 'Type']])
+            st.dataframe(df[['Filename', 'Course', 'Semester', 'Year', 'Subject', 'Type', 'Uploader']])
 
-            for c, s, y, sub, typ, fname, fpath in files:
-                st.download_button(label=f"⬇️ Download {fname}", data=open(fpath, "rb"), file_name=fname, key=fpath)
+            for _, row in df.iterrows():
+                st.download_button(label=f"⬇️ Download {row['Filename']}",
+                                   data=open(row["Path"], "rb"),
+                                   file_name=row["Filename"],
+                                   key=row["Path"])
         else:
             st.warning("No files found.")
 
@@ -240,13 +245,14 @@ elif choice == "Admin Dashboard":
             st.success("You have been logged out.")
             st.rerun()
 
-        # Upload Section
         st.markdown("### ⬆️ Upload New Material")
         uploaded_file = st.file_uploader("Choose a file")
         course = st.selectbox("Course", sorted(["BSc Physical Science", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"]))
         semester = st.selectbox("Semester", ["1st", "2nd", "3rd", "4th", "5th", "6th"])
         year = st.selectbox("Year", ["2023", "2024", "2025"])
+        uploader_name = st.text_input("👤 Enter your name (Uploader)", placeholder="e.g. Dr. Nishant Sharma")
 
+        # SUBJECT MANAGEMENT
         st.markdown("### 📘 Subject Management")
         subject_df = pd.read_csv(SUBJECTS_FILE)
         subject_list = sorted(subject_df["Subject"].tolist())
@@ -270,27 +276,26 @@ elif choice == "Admin Dashboard":
         file_type = st.selectbox("Type", ["Notes", "PYQ", "Books"])
 
         if st.button("Upload"):
-            if uploaded_file and course and semester and year and subject and file_type:
+            if uploaded_file and uploader_name.strip() and course and semester and year and subject and file_type:
                 try:
-                    saved_path = save_file(uploaded_file, course, semester, year, subject, file_type)
-                    st.success(f"✅ File uploaded successfully: {saved_path}")
+                    saved_path = save_file(uploaded_file, course, semester, year, subject, file_type, uploader_name)
+                    st.success(f"✅ File uploaded successfully by {uploader_name}: {saved_path}")
                 except Exception as e:
                     st.error(f"Error saving file: {e}")
             else:
-                st.error("Please fill all fields and select a file.")
+                st.error("Please fill all fields and select a file (including uploader name).")
 
-        # Uploaded Files
+        # Uploaded Materials
         st.markdown("---")
         st.markdown("### 📘 Uploaded Materials")
-        files = list_files()
-        if files:
-            df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
-            st.dataframe(df[['Filename', 'Course', 'Semester', 'Year', 'Subject', 'Type']])
+        meta_df = pd.read_csv(METADATA_FILE)
+        if not meta_df.empty:
+            st.dataframe(meta_df[['Filename', 'Course', 'Semester', 'Year', 'Subject', 'Type', 'Uploader']])
 
             st.markdown("### 🗑️ Delete Uploaded Material")
-            filename_to_delete = st.selectbox("Select file to delete", df['Filename'].tolist())
+            filename_to_delete = st.selectbox("Select file to delete", meta_df['Filename'].tolist())
             if st.button("Confirm Delete"):
-                file_path = df.loc[df['Filename'] == filename_to_delete, 'Path'].values[0]
+                file_path = meta_df.loc[meta_df['Filename'] == filename_to_delete, 'Path'].values[0]
                 if delete_file(file_path):
                     st.success(f"✅ Deleted {filename_to_delete}")
                     st.rerun()
@@ -299,10 +304,9 @@ elif choice == "Admin Dashboard":
         else:
             st.info("No uploaded materials found.")
 
-        # Suggestions
+        # Suggestions Section
         st.markdown("---")
         st.markdown("### 📨 Student Suggestions / Queries")
-
         suggestions_df = pd.read_csv(SUGGESTIONS_FILE)
         if suggestions_df.empty:
             st.info("No suggestions submitted yet.")
