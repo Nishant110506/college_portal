@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-import shutil
 import datetime
 import uuid
 import pandas as pd
@@ -10,24 +9,9 @@ import pandas as pd
 # ----------------------------
 st.set_page_config(page_title="College PYQ & Notes Portal", page_icon="📚", layout="wide")
 
-UPLOAD_FOLDER = "uploads"
-SUGGESTIONS_FILE = "suggestions.csv"  # ✅ new file for suggestions
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-if not os.path.exists(SUGGESTIONS_FILE):
-    pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Suggestion"]).to_csv(SUGGESTIONS_FILE, index=False)
-
-ADMIN_USERNAME = "nish20"
-ADMIN_PASSWORD = "45009Ni"
-
-if "admin_logged_in" not in st.session_state:
-    st.session_state.admin_logged_in = False
-    # Disable typing in selectboxes (students can only click)
+# Disable typing in selectboxes (students can only click)
 st.markdown("""
     <style>
-    /* Disable typing in dropdowns */
     div[data-baseweb="select"] input {
         pointer-events: none;
     }
@@ -37,13 +21,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+UPLOAD_FOLDER = "uploads"
+SUGGESTIONS_FILE = "suggestions.csv"
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+if not os.path.exists(SUGGESTIONS_FILE):
+    pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Suggestion", "Completed"]).to_csv(SUGGESTIONS_FILE, index=False)
+
+ADMIN_USERNAME = "nish20"
+ADMIN_PASSWORD = "45009Ni"
+
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
 
 
 # ----------------------------
 # FUNCTIONS
 # ----------------------------
 def save_file(uploaded_file, course, semester, year, subject, file_type):
-    safe_course = course.replace(" ", "_").replace("\\", "_").replace("/", "_")
+    safe_course = course.replace(" ", "_")
     safe_semester = semester.replace(" ", "_")
     safe_year = year.replace(" ", "_")
     safe_subject = subject.replace(" ", "_")
@@ -111,6 +109,7 @@ def save_suggestion(course, semester, year, subject, suggestion):
         "Year": year,
         "Subject": subject,
         "Suggestion": suggestion,
+        "Completed": False
     }
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df.to_csv(SUGGESTIONS_FILE, index=False)
@@ -128,7 +127,6 @@ st.markdown("---")
 menu = ["Home", "Search Materials", "Admin Login", "Admin Dashboard"]
 choice = st.sidebar.radio("Navigation", menu)
 
-
 # ----------------------------
 # HOME
 # ----------------------------
@@ -138,22 +136,20 @@ if choice == "Home":
     st.write("Upload, view, and search for PYQs and notes easily!")
     st.info("Use the sidebar to navigate between student and admin sections.")
 
-
 # ----------------------------
-# SEARCH MATERIALS (STUDENT DASHBOARD)
+# SEARCH MATERIALS (STUDENT)
 # ----------------------------
 elif choice == "Search Materials":
     st.subheader("🎓 Search or Browse Materials")
 
-    course_options = sorted([d for d in os.listdir(UPLOAD_FOLDER) if os.path.isdir(os.path.join(UPLOAD_FOLDER, d))] + 
-                            ["BSc Physical Science", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"])
+    course_options = sorted(["BSc Physical Science", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"])
     subject_options = ["All", "Hindi", "English", "Maths", "Physics", "Computer Science",
                        "Political Science", "History", "Geography", "AEC", "DSE", "SEC", "VAC", "GE"]
 
     course = st.selectbox("Select Course", ["All"] + course_options)
     semester = st.selectbox("Select Semester", ["All", "1st", "2nd", "3rd", "4th", "5th", "6th"])
     year = st.selectbox("Select Year", ["All", "2023", "2024", "2025"])
-    subject = st.selectbox("Select Subject", subject_options)  # ✅ new subject dropdown
+    subject = st.selectbox("Select Subject", subject_options)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -193,7 +189,6 @@ elif choice == "Search Materials":
         else:
             st.warning("Please write something before submitting.")
 
-
 # ----------------------------
 # ADMIN LOGIN
 # ----------------------------
@@ -208,7 +203,6 @@ elif choice == "Admin Login":
             st.rerun()
         else:
             st.error("Invalid credentials")
-
 
 # ----------------------------
 # ADMIN DASHBOARD
@@ -238,7 +232,7 @@ elif choice == "Admin Dashboard":
             if uploaded_file and course and semester and year and subject and file_type:
                 try:
                     saved_path = save_file(uploaded_file, course, semester, year, subject, file_type)
-                    st.success(f"File uploaded successfully: {saved_path}")
+                    st.success(f"✅ File uploaded successfully: {saved_path}")
                 except Exception as e:
                     st.error(f"Error saving file: {e}")
             else:
@@ -251,34 +245,49 @@ elif choice == "Admin Dashboard":
         if files:
             df = pd.DataFrame(files, columns=['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename', 'Path'])
             st.dataframe(df[['Course', 'Semester', 'Year', 'Subject', 'Type', 'Filename']])
-
-            selected_row = st.selectbox(
-                "Select a file to manage",
-                df.index,
-                format_func=lambda idx: f"{df.at[idx, 'Filename']} — {df.at[idx, 'Course']} Sem {df.at[idx, 'Semester']} Year {df.at[idx, 'Year']}"
-            )
-            selected_file = df.loc[selected_row]
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Delete Selected File"):
-                    if delete_file(selected_file['Path']):
-                        st.success(f"Deleted {selected_file['Filename']}")
-                        st.rerun()
-                    else:
-                        st.error("Delete failed.")
-            with col2:
-                with open(selected_file['Path'], "rb") as f:
-                    st.download_button("⬇️ Download", data=f, file_name=selected_file['Filename'])
         else:
             st.info("No files uploaded yet.")
 
         st.markdown("---")
         st.markdown("### 📨 Student Suggestions / Queries")
 
-        if os.path.exists(SUGGESTIONS_FILE):
-            suggestions_df = pd.read_csv(SUGGESTIONS_FILE)
-            if not suggestions_df.empty:
-                st.dataframe(suggestions_df)
+        suggestions_df = pd.read_csv(SUGGESTIONS_FILE)
+
+        if suggestions_df.empty:
+            st.info("No suggestions submitted yet.")
+        else:
+            filter_choice = st.radio(
+                "👁️ Show Suggestions:",
+                ["All", "Pending Only", "Completed Only"],
+                horizontal=True
+            )
+
+            if filter_choice == "Pending Only":
+                filtered_df = suggestions_df[suggestions_df["Completed"] == False].copy()
+            elif filter_choice == "Completed Only":
+                filtered_df = suggestions_df[suggestions_df["Completed"] == True].copy()
             else:
-                st.info("No suggestions submitted yet.")
+                filtered_df = suggestions_df.copy()
+
+            filtered_df = filtered_df.reset_index()  # retain original index
+
+            for _, row in filtered_df.iterrows():
+                idx = row["index"]  # true index in CSV
+                with st.expander(f"🕒 {row['Timestamp']} — {row['Course']} | {row['Semester']} | {row['Year']} | {row['Subject']}"):
+                    st.write(f"**Suggestion:** {row['Suggestion']}")
+                    completed = st.checkbox("✅ Mark as Completed", value=row["Completed"], key=f"comp_{idx}")
+                    delete_btn = st.button("🗑️ Delete", key=f"del_{idx}")
+
+                    if completed != row["Completed"]:
+                        df = pd.read_csv(SUGGESTIONS_FILE)
+                        df.at[idx, "Completed"] = completed
+                        df.to_csv(SUGGESTIONS_FILE, index=False)
+                        st.success("✅ Updated status!")
+                        st.rerun()
+
+                    if delete_btn:
+                        df = pd.read_csv(SUGGESTIONS_FILE)
+                        df = df.drop(index=idx).reset_index(drop=True)
+                        df.to_csv(SUGGESTIONS_FILE, index=False)
+                        st.success("🗑️ Deleted suggestion successfully!")
+                        st.rerun()
