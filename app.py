@@ -181,7 +181,8 @@ elif choice == "Admin Dashboard":
         course = st.selectbox("Course", sorted(["BSc Physical Science ", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"]))
         semester = st.selectbox("Semester", ["1st", "2nd", "3rd", "4th", "5th", "6th"])
         year = st.selectbox("Year", ["2023", "2024", "2025"])
-        subject = st.text_input("Subject",["Hindi", "English", "Maths", "Physics", "Computer Science", "Political Science", "History", "Geography", "AEC", "DSE", "SEC", "VAC", "GE"])
+        subject = st.text_input("Subject")
+        subject = st.selectbox("Subject", ["Hindi", "English", "Maths", "Physics", "Computer Science", "Political Science", "History", "Geography", "AEC", "DSE", "SEC", "VAC", "GE"])
         file_type = st.selectbox("Type", ["Notes", "PYQ", "Books"])
 
         if st.button("Upload"):
