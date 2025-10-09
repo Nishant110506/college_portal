@@ -3,7 +3,7 @@ import os
 import shutil
 import datetime
 import uuid
-import pandas as pd  # ✅ keep all imports together at top
+import pandas as pd
 
 # ----------------------------
 # BASIC SETUP
@@ -11,8 +11,13 @@ import pandas as pd  # ✅ keep all imports together at top
 st.set_page_config(page_title="College PYQ & Notes Portal", page_icon="📚", layout="wide")
 
 UPLOAD_FOLDER = "uploads"
+SUGGESTIONS_FILE = "suggestions.csv"  # ✅ new file for suggestions
+
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+if not os.path.exists(SUGGESTIONS_FILE):
+    pd.DataFrame(columns=["Timestamp", "Course", "Semester", "Year", "Subject", "Suggestion"]).to_csv(SUGGESTIONS_FILE, index=False)
 
 ADMIN_USERNAME = "nish20"
 ADMIN_PASSWORD = "45009Ni"
@@ -25,7 +30,6 @@ if "admin_logged_in" not in st.session_state:
 # FUNCTIONS
 # ----------------------------
 def save_file(uploaded_file, course, semester, year, subject, file_type):
-    """Save uploaded file with structured naming."""
     safe_course = course.replace(" ", "_").replace("\\", "_").replace("/", "_")
     safe_semester = semester.replace(" ", "_")
     safe_year = year.replace(" ", "_")
@@ -44,8 +48,7 @@ def save_file(uploaded_file, course, semester, year, subject, file_type):
     return file_path
 
 
-def list_files(course=None, semester=None, year=None):
-    """List uploaded files filtered by course, semester, year."""
+def list_files(course=None, semester=None, year=None, subject=None):
     all_files = []
     for root, _, files in os.walk(UPLOAD_FOLDER):
         for file in files:
@@ -53,36 +56,51 @@ def list_files(course=None, semester=None, year=None):
             rel_path = os.path.relpath(file_path, UPLOAD_FOLDER)
             parts = rel_path.split(os.sep)
 
-            # Extract info from folder structure and filename
             if len(parts) >= 4:
                 c, s, y = parts[0], parts[1], parts[2]
                 fname = parts[3]
 
-                # Extract subject & type from filename if possible
-                subject = "Unknown"
+                subject_name = "Unknown"
                 ftype = "Unknown"
                 if "_" in fname:
                     split_name = fname.split("_")
-                    subject = split_name[0]
+                    subject_name = split_name[0]
                     if len(split_name) > 1:
                         ftype = split_name[1]
 
-                if (not course or c == course) and (not semester or s == semester) and (not year or y == year):
-                    all_files.append((c, s, y, subject, ftype, fname, file_path))
-
+                if (
+                    (not course or c == course)
+                    and (not semester or s == semester)
+                    and (not year or y == year)
+                    and (not subject or subject_name == subject)
+                ):
+                    all_files.append((c, s, y, subject_name, ftype, fname, file_path))
     return all_files
 
 
 def delete_file(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)
-        # Remove empty folders up to UPLOAD_FOLDER
         dir_path = os.path.dirname(file_path)
         while dir_path != UPLOAD_FOLDER and not os.listdir(dir_path):
             os.rmdir(dir_path)
             dir_path = os.path.dirname(dir_path)
         return True
     return False
+
+
+def save_suggestion(course, semester, year, subject, suggestion):
+    df = pd.read_csv(SUGGESTIONS_FILE)
+    new_row = {
+        "Timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Course": course,
+        "Semester": semester,
+        "Year": year,
+        "Subject": subject,
+        "Suggestion": suggestion,
+    }
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    df.to_csv(SUGGESTIONS_FILE, index=False)
 
 
 # ----------------------------
@@ -109,15 +127,20 @@ if choice == "Home":
 
 
 # ----------------------------
-# SEARCH MATERIALS
+# SEARCH MATERIALS (STUDENT DASHBOARD)
 # ----------------------------
 elif choice == "Search Materials":
     st.subheader("🎓 Search or Browse Materials")
 
-    course_options = sorted([d for d in os.listdir(UPLOAD_FOLDER) if os.path.isdir(os.path.join(UPLOAD_FOLDER, d))])
-    course = st.selectbox("Select Course (optional)", ["All"] + course_options)
-    semester = st.selectbox("Select Semester (optional)", ["All", "1st", "2nd", "3rd", "4th", "5th", "6th"])
-    year = st.selectbox("Select Year (optional)", ["All", "2023", "2024", "2025"])
+    course_options = sorted([d for d in os.listdir(UPLOAD_FOLDER) if os.path.isdir(os.path.join(UPLOAD_FOLDER, d))] + 
+                            ["BSc Physical Science", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"])
+    subject_options = ["All", "Hindi", "English", "Maths", "Physics", "Computer Science",
+                       "Political Science", "History", "Geography", "AEC", "DSE", "SEC", "VAC", "GE"]
+
+    course = st.selectbox("Select Course", ["All"] + course_options)
+    semester = st.selectbox("Select Semester", ["All", "1st", "2nd", "3rd", "4th", "5th", "6th"])
+    year = st.selectbox("Select Year", ["All", "2023", "2024", "2025"])
+    subject = st.selectbox("Select Subject", subject_options)  # ✅ new subject dropdown
 
     col1, col2 = st.columns(2)
     with col1:
@@ -132,7 +155,8 @@ elif choice == "Search Materials":
             files = list_files(
                 None if course == "All" else course,
                 None if semester == "All" else semester,
-                None if year == "All" else year
+                None if year == "All" else year,
+                None if subject == "All" else subject,
             )
 
         if files:
@@ -143,6 +167,18 @@ elif choice == "Search Materials":
                     st.download_button(label="⬇️ Download", data=f, file_name=fname, key=fpath)
         else:
             st.warning("No files found.")
+
+    st.markdown("---")
+    st.markdown("### 💬 Suggestion Box (For Students)")
+    st.info("Submit your queries, issues, or suggestions to the admin here.")
+
+    suggestion_text = st.text_area("Enter your suggestion or query here:")
+    if st.button("📨 Submit Suggestion"):
+        if suggestion_text.strip():
+            save_suggestion(course, semester, year, subject, suggestion_text.strip())
+            st.success("✅ Your suggestion has been sent to the admin!")
+        else:
+            st.warning("Please write something before submitting.")
 
 
 # ----------------------------
@@ -178,11 +214,11 @@ elif choice == "Admin Dashboard":
         st.markdown("### ⬆️ Upload New Material")
 
         uploaded_file = st.file_uploader("Choose a file")
-        course = st.selectbox("Course", sorted(["BSc Physical Science ", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"]))
+        course = st.selectbox("Course", sorted(["BSc Physical Science", "BCom (hons.)", "Bcom (Prog.)", "BA (hons.)", "BA (Prog.)"]))
         semester = st.selectbox("Semester", ["1st", "2nd", "3rd", "4th", "5th", "6th"])
         year = st.selectbox("Year", ["2023", "2024", "2025"])
-        subject = st.text_input("Subject")
-        subject = st.selectbox("Subject", ["Hindi", "English", "Maths", "Physics", "Computer Science", "Political Science", "History", "Geography", "AEC", "DSE", "SEC", "VAC", "GE"])
+        subject = st.selectbox("Subject", ["Hindi", "English", "Maths", "Physics", "Computer Science",
+                                           "Political Science", "History", "Geography", "AEC", "DSE", "SEC", "VAC", "GE"])
         file_type = st.selectbox("Type", ["Notes", "PYQ", "Books"])
 
         if st.button("Upload"):
@@ -223,3 +259,13 @@ elif choice == "Admin Dashboard":
                     st.download_button("⬇️ Download", data=f, file_name=selected_file['Filename'])
         else:
             st.info("No files uploaded yet.")
+
+        st.markdown("---")
+        st.markdown("### 📨 Student Suggestions / Queries")
+
+        if os.path.exists(SUGGESTIONS_FILE):
+            suggestions_df = pd.read_csv(SUGGESTIONS_FILE)
+            if not suggestions_df.empty:
+                st.dataframe(suggestions_df)
+            else:
+                st.info("No suggestions submitted yet.")
