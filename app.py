@@ -24,6 +24,19 @@ ADMIN_PASSWORD = "45009Ni"
 
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
+    # Disable typing in selectboxes (students can only click)
+st.markdown("""
+    <style>
+    /* Disable typing in dropdowns */
+    div[data-baseweb="select"] input {
+        pointer-events: none;
+    }
+    div[data-baseweb="select"] input:focus {
+        outline: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 
 
 # ----------------------------
